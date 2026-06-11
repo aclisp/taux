@@ -6,20 +6,40 @@ const FILE_ICONS = {
   // Folders
   directory: '📁',
   // Code
-  js: '📄', ts: '📄', jsx: '📄', tsx: '📄',
-  py: '🐍', rb: '💎', go: '📄', rs: '🦀',
+  js: '📄',
+  ts: '📄',
+  jsx: '📄',
+  tsx: '📄',
+  py: '🐍',
+  rb: '💎',
+  go: '📄',
+  rs: '🦀',
   // Web
-  html: '🌐', css: '🎨', svg: '🎨',
+  html: '🌐',
+  css: '🎨',
+  svg: '🎨',
   // Data
-  json: '📋', yaml: '📋', yml: '📋', toml: '📋',
-  xml: '📋', csv: '📋',
+  json: '📋',
+  yaml: '📋',
+  yml: '📋',
+  toml: '📋',
+  xml: '📋',
+  csv: '📋',
   // Docs
-  md: '📝', txt: '📝', rst: '📝',
+  md: '📝',
+  txt: '📝',
+  rst: '📝',
   // Images
-  png: '🖼️', jpg: '🖼️', jpeg: '🖼️', gif: '🖼️',
-  webp: '🖼️', ico: '🖼️',
+  png: '🖼️',
+  jpg: '🖼️',
+  jpeg: '🖼️',
+  gif: '🖼️',
+  webp: '🖼️',
+  ico: '🖼️',
   // Config
-  env: '🔒', gitignore: '🔒', lock: '🔒',
+  env: '🔒',
+  gitignore: '🔒',
+  lock: '🔒',
   // Default
   default: '📄',
 };
@@ -52,9 +72,7 @@ export class FileBrowser {
     this.container.innerHTML = '<div class="file-loading">Loading…</div>';
 
     try {
-      const url = dirPath
-        ? `/api/files?path=${encodeURIComponent(dirPath)}`
-        : '/api/files';
+      const url = dirPath ? `/api/files?path=${encodeURIComponent(dirPath)}` : '/api/files';
       const res = await fetch(url);
       const data = await res.json();
 
@@ -67,7 +85,7 @@ export class FileBrowser {
       this.pathEl.textContent = data.path;
       this.pathEl.title = data.path;
       this.render(data.items);
-    } catch (err) {
+    } catch (_err) {
       this.container.innerHTML = '<div class="file-loading">Failed to load</div>';
     }
   }
@@ -155,7 +173,7 @@ export class FileBrowser {
     const input = this.messageInput;
     const start = input.selectionStart;
     const end = input.selectionEnd;
-    input.value = input.value.substring(0, start) + filePath + ' ' + input.value.substring(end);
+    input.value = `${input.value.substring(0, start) + filePath} ${input.value.substring(end)}`;
     input.selectionStart = input.selectionEnd = start + filePath.length + 1;
     input.focus();
     input.dispatchEvent(new Event('input'));
@@ -181,7 +199,7 @@ export class FileBrowser {
 
       const filePath = e.dataTransfer.getData('text/plain');
       // Accept Unix paths (/) and Windows paths (C:\ or C:/)
-      if (filePath && (filePath.startsWith('/') || /^[A-Za-z]:[\\\/]/.test(filePath))) {
+      if (filePath && (filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath))) {
         this.insertPath(filePath);
       }
     });

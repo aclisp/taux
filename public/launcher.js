@@ -16,7 +16,7 @@ export class Launcher {
       const data = await res.json();
       this.projects = data.projects || [];
       this.render();
-    } catch (e) {
+    } catch (_e) {
       this.container.innerHTML = '<div class="launcher-loading">Failed to load projects</div>';
     }
   }
@@ -32,7 +32,7 @@ export class Launcher {
     }
 
     // Find max session count for relative sizing
-    const maxSessions = Math.max(1, ...this.projects.map(p => p.sessionCount));
+    const maxSessions = Math.max(1, ...this.projects.map((p) => p.sessionCount));
     const now = Date.now();
 
     // Sort: active first, then by recency
@@ -42,19 +42,20 @@ export class Launcher {
       return (b.lastActive || 0) - (a.lastActive || 0);
     });
 
-    const bubbles = sorted.map(p => {
-      // Size: scale between 0.7 and 1.3 based on session count
-      const sizeRatio = 0.7 + (p.sessionCount / maxSessions) * 0.6;
+    const bubbles = sorted
+      .map((p) => {
+        // Size: scale between 0.7 and 1.3 based on session count
+        const sizeRatio = 0.7 + (p.sessionCount / maxSessions) * 0.6;
 
-      // Recency: how fresh is this project (0 = ancient, 1 = today)
-      let freshness = 0;
-      if (p.lastActive) {
-        const ageMs = now - p.lastActive;
-        const ageDays = ageMs / (1000 * 60 * 60 * 24);
-        freshness = Math.max(0, 1 - (ageDays / 30)); // fades over 30 days
-      }
+        // Recency: how fresh is this project (0 = ancient, 1 = today)
+        let freshness = 0;
+        if (p.lastActive) {
+          const ageMs = now - p.lastActive;
+          const ageDays = ageMs / (1000 * 60 * 60 * 24);
+          freshness = Math.max(0, 1 - ageDays / 30); // fades over 30 days
+        }
 
-      return `
+        return `
         <button class="launcher-bubble${p.active ? ' active' : ''}"
                 data-path="${this.escAttr(p.path)}"
                 style="--size: ${sizeRatio}; --freshness: ${freshness.toFixed(2)}"
@@ -62,7 +63,8 @@ export class Launcher {
           <span class="launcher-bubble-name">${this.escHtml(p.name)}</span>
           ${p.active ? '<span class="launcher-bubble-dot"></span>' : ''}
         </button>`;
-    }).join('');
+      })
+      .join('');
 
     this.container.innerHTML = `
       <div class="launcher-content">
@@ -71,7 +73,7 @@ export class Launcher {
       </div>`;
 
     // Bind click handlers
-    this.container.querySelectorAll('.launcher-bubble').forEach(btn => {
+    this.container.querySelectorAll('.launcher-bubble').forEach((btn) => {
       btn.addEventListener('click', () => {
         const projectPath = btn.dataset.path;
         if (this.onLaunch) this.onLaunch(projectPath);

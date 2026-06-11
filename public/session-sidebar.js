@@ -42,8 +42,9 @@ export class SessionSidebar {
 
   async loadSessions() {
     try {
-      this.container.innerHTML = Array.from({length: 6}, () =>
-        '<div class="session-skeleton"><div class="session-skeleton-title"></div><div class="session-skeleton-meta"></div></div>'
+      this.container.innerHTML = Array.from(
+        { length: 6 },
+        () => '<div class="session-skeleton"><div class="session-skeleton-title"></div><div class="session-skeleton-meta"></div></div>',
       ).join('');
       const res = await fetch('/api/sessions');
       const data = await res.json();
@@ -135,7 +136,7 @@ export class SessionSidebar {
       // Find the matching project/session to pass to onSessionSelect
       item.addEventListener('click', () => {
         for (const project of this.projects) {
-          const session = project.sessions.find(s => s.filePath === result.filePath);
+          const session = project.sessions.find((s) => s.filePath === result.filePath);
           if (session) {
             this.onSessionSelect(session, project);
             return;
@@ -162,8 +163,12 @@ export class SessionSidebar {
 
   applySearch() {
     if (!this.searchQuery) {
-      this.container.querySelectorAll('.session-item').forEach(el => el.classList.remove('hidden'));
-      this.container.querySelectorAll('.project-group').forEach(el => el.style.display = '');
+      this.container.querySelectorAll('.session-item').forEach((el) => {
+        el.classList.remove('hidden');
+      });
+      this.container.querySelectorAll('.project-group').forEach((el) => {
+        el.style.display = '';
+      });
       const favSection = this.container.querySelector('.favourites-group');
       if (favSection) favSection.style.display = '';
       // Remove full-text results
@@ -176,7 +181,7 @@ export class SessionSidebar {
     const favSection = this.container.querySelector('.favourites-group');
     if (favSection) {
       let hasVisible = false;
-      favSection.querySelectorAll('.session-item').forEach(item => {
+      favSection.querySelectorAll('.session-item').forEach((item) => {
         const title = (item.querySelector('.session-title')?.textContent || '').toLowerCase();
         const matches = title.includes(this.searchQuery);
         item.classList.toggle('hidden', !matches);
@@ -185,9 +190,9 @@ export class SessionSidebar {
       favSection.style.display = hasVisible ? '' : 'none';
     }
 
-    this.container.querySelectorAll('.project-group').forEach(group => {
+    this.container.querySelectorAll('.project-group').forEach((group) => {
       let hasVisible = false;
-      group.querySelectorAll('.session-item').forEach(item => {
+      group.querySelectorAll('.session-item').forEach((item) => {
         const title = (item.querySelector('.session-title')?.textContent || '').toLowerCase();
         const matches = title.includes(this.searchQuery);
         item.classList.toggle('hidden', !matches);
@@ -199,21 +204,23 @@ export class SessionSidebar {
 
   setActive(filePath) {
     this.activeSessionFile = filePath;
-    this.container.querySelectorAll('.session-item').forEach(el => {
+    this.container.querySelectorAll('.session-item').forEach((el) => {
       el.classList.toggle('active', el.dataset.filePath === filePath);
     });
   }
 
   clearActive() {
     this.activeSessionFile = null;
-    this.container.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
+    this.container.querySelectorAll('.session-item').forEach((el) => {
+      el.classList.remove('active');
+    });
   }
 
   // ═══════════════════════════════════════
   // Context Menu
   // ═══════════════════════════════════════
 
-  showContextMenu(e, session, project, itemEl) {
+  showContextMenu(e, session, _project, itemEl) {
     e.preventDefault();
     this.closeContextMenu();
 
@@ -281,7 +288,9 @@ export class SessionSidebar {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'set_session_name', name: newName }),
           });
-        } catch { /* silent */ }
+        } catch {
+          /* silent */
+        }
       }
       const newTitle = document.createElement('div');
       newTitle.className = 'session-title';
@@ -292,8 +301,14 @@ export class SessionSidebar {
 
     input.addEventListener('blur', commit);
     input.addEventListener('keydown', (ke) => {
-      if (ke.key === 'Enter') { ke.preventDefault(); input.blur(); }
-      if (ke.key === 'Escape') { input.value = currentName; input.blur(); }
+      if (ke.key === 'Enter') {
+        ke.preventDefault();
+        input.blur();
+      }
+      if (ke.key === 'Escape') {
+        input.value = currentName;
+        input.blur();
+      }
     });
   }
 
@@ -324,17 +339,21 @@ export class SessionSidebar {
     }
   }
 
-  async exportSession(session) {
+  async exportSession(_session) {
     try {
-      const data = await (await fetch('/api/rpc', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'export_html' }),
-      })).json();
+      const data = await (
+        await fetch('/api/rpc', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'export_html' }),
+        })
+      ).json();
       if (data?.success && data.data?.path) {
         window.open(`/api/sessions/${encodeURIComponent(data.data.path)}`);
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   // ═══════════════════════════════════════

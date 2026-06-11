@@ -17,7 +17,7 @@ export class ToolCardRenderer {
 
     const argsPreview = this.getArgsPreview(toolName, args);
     const argsJson = this.formatJson(args);
-    const isExpanded = (status === 'streaming' || status === 'pending');
+    const isExpanded = status === 'streaming' || status === 'pending';
 
     const isEdit = (toolName === 'edit' || toolName === 'Edit') && args && (args.oldText || args.old_text) && (args.newText || args.new_text);
 
@@ -157,16 +157,26 @@ export class ToolCardRenderer {
     const copyBtn = document.createElement('button');
     copyBtn.className = 'tool-action-btn copy-output-btn';
     copyBtn.title = 'Copy output';
-    copyBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
+    copyBtn.innerHTML =
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
     copyBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const output = card.querySelector('.tool-output');
-      if (!output || !output.textContent.trim()) return;
+      if (!output?.textContent.trim()) return;
       const text = output.textContent;
-      (navigator.clipboard ? navigator.clipboard.writeText(text) : new Promise((r) => {
-        const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;left:-9999px';
-        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); r();
-      })).then(() => {
+      (navigator.clipboard
+        ? navigator.clipboard.writeText(text)
+        : new Promise((r) => {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;left:-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            r();
+          })
+      ).then(() => {
         copyBtn.classList.add('copied');
         setTimeout(() => copyBtn.classList.remove('copied'), 1500);
       });
@@ -240,7 +250,7 @@ export class ToolCardRenderer {
   }
 
   /** Compact preview for the header line */
-  getArgsPreview(toolName, args) {
+  getArgsPreview(_toolName, args) {
     if (!args || Object.keys(args).length === 0) return '';
 
     // Show the most relevant arg inline
@@ -279,7 +289,7 @@ export class ToolCardRenderer {
     for (const line of oldLines) {
       const el = document.createElement('div');
       el.className = 'diff-line diff-removed';
-      el.textContent = '- ' + line;
+      el.textContent = `- ${line}`;
       container.appendChild(el);
     }
 
@@ -287,7 +297,7 @@ export class ToolCardRenderer {
     for (const line of newLines) {
       const el = document.createElement('div');
       el.className = 'diff-line diff-added';
-      el.textContent = '+ ' + line;
+      el.textContent = `+ ${line}`;
       container.appendChild(el);
     }
 
@@ -299,7 +309,7 @@ export class ToolCardRenderer {
 
     if (result.content && Array.isArray(result.content)) {
       return result.content
-        .map(block => {
+        .map((block) => {
           if (block.type === 'text') return block.text;
           return JSON.stringify(block);
         })
@@ -318,8 +328,7 @@ export class ToolCardRenderer {
   scrollToBottom() {
     if (this.container) {
       const threshold = 100;
-      const isNear =
-        this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight < threshold;
+      const isNear = this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight < threshold;
       if (isNear) {
         requestAnimationFrame(() => {
           this.container.scrollTop = this.container.scrollHeight;
@@ -329,21 +338,23 @@ export class ToolCardRenderer {
   }
 
   expandAll() {
-    this.toolCards.forEach(card => {
+    this.toolCards.forEach((card) => {
       card.querySelector('.tool-card-body')?.classList.add('expanded');
       card.querySelector('.tool-card-chevron')?.classList.add('expanded');
     });
   }
 
   collapseAll() {
-    this.toolCards.forEach(card => {
+    this.toolCards.forEach((card) => {
       card.querySelector('.tool-card-body')?.classList.remove('expanded');
       card.querySelector('.tool-card-chevron')?.classList.remove('expanded');
     });
   }
 
   clear() {
-    this.toolCards.forEach((card) => card.remove());
+    this.toolCards.forEach((card) => {
+      card.remove();
+    });
     this.toolCards.clear();
   }
 }

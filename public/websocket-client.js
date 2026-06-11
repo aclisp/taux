@@ -83,7 +83,9 @@ export class WebSocketClient extends EventTarget {
     this.isIntentionallyClosed = false;
     this.connectionState = 'closed';
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      try { this.ws.close(1000, 'force reconnect'); } catch (e) {}
+      try {
+        this.ws.close(1000, 'force reconnect');
+      } catch (_e) {}
     }
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -101,9 +103,9 @@ export class WebSocketClient extends EventTarget {
 
     this.reconnectAttempts++;
     const delay = Math.min(this.maxReconnectDelay, this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1));
-    
+
     console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-    
+
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();

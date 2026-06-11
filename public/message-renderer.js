@@ -12,8 +12,7 @@ export class MessageRenderer {
     // Track scroll position for smart auto-scroll
     this.container.addEventListener('scroll', () => {
       const threshold = 100;
-      this.isNearBottom =
-        this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight < threshold;
+      this.isNearBottom = this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight < threshold;
     });
   }
 
@@ -45,11 +44,14 @@ export class MessageRenderer {
 
     let imagesHtml = '';
     if (message.images && message.images.length > 0) {
-      imagesHtml = '<div class="message-images">' +
-        message.images.map(img => {
-          const src = img.data.startsWith('data:') ? img.data : `data:${img.mimeType || 'image/png'};base64,${img.data}`;
-          return `<img class="message-image" src="${src}" alt="Attached image" />`;
-        }).join('') +
+      imagesHtml =
+        '<div class="message-images">' +
+        message.images
+          .map((img) => {
+            const src = img.data.startsWith('data:') ? img.data : `data:${img.mimeType || 'image/png'};base64,${img.data}`;
+            return `<img class="message-image" src="${src}" alt="Attached image" />`;
+          })
+          .join('') +
         '</div>';
     }
 
@@ -87,7 +89,7 @@ export class MessageRenderer {
     }
 
     // Usage/cost info
-    if (message.usage && message.usage.cost) {
+    if (message.usage?.cost) {
       const cost = message.usage.cost.total;
       if (cost > 0) {
         usageHtml = `<span class="message-usage">$${cost.toFixed(4)}</span>`;
@@ -110,7 +112,7 @@ export class MessageRenderer {
   }
 
   renderThinkingBlock(thinking) {
-    const id = 'thinking-' + Math.random().toString(36).slice(2, 8);
+    const id = `thinking-${Math.random().toString(36).slice(2, 8)}`;
     return `<div class="thinking-block">
 <div class="thinking-toggle" onclick="var c=document.getElementById('${id}');c.classList.toggle('expanded');this.classList.toggle('expanded')">
 <span class="chevron"><svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><path d="M2 1l4 3-4 3z"/></svg></span>
@@ -171,7 +173,7 @@ export class MessageRenderer {
       // Get the raw text (exclude thinking block text)
       const streamingText = contentDiv.querySelector('.streaming-text');
       const rawText = streamingText ? streamingText.textContent : contentDiv.textContent;
-      
+
       // Rebuild with thinking block (if any) + markdown text
       let html = '';
       if (thinking) {
@@ -185,13 +187,14 @@ export class MessageRenderer {
     if (!messageElement.querySelector('.message-copy-btn')) {
       const btn = document.createElement('button');
       btn.className = 'message-copy-btn';
-      btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+      btn.innerHTML =
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
       messageElement.appendChild(btn);
       this._setupCopyBtn(messageElement);
     }
 
     // Add usage info if available
-    if (usage && usage.cost && usage.cost.total > 0) {
+    if (usage?.cost && usage.cost.total > 0) {
       if (!messageElement.querySelector('.message-usage')) {
         const span = document.createElement('span');
         span.className = 'message-usage';

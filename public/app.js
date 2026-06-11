@@ -2,19 +2,18 @@
  * Main App - Ties everything together
  */
 
-import { WebSocketClient } from './websocket-client.js';
-import { StateManager } from './state.js';
-import { MessageRenderer } from './message-renderer.js';
-import { ToolCardRenderer } from './tool-card.js';
 import { DialogHandler } from './dialogs.js';
-import { SessionSidebar } from './session-sidebar.js';
-import { themes, applyTheme, getCurrentTheme } from './themes.js';
 import { FileBrowser, getFileIcon } from './file-browser.js';
 import { Launcher } from './launcher.js';
-
+import { MessageRenderer } from './message-renderer.js';
+import { SessionSidebar } from './session-sidebar.js';
+import { StateManager } from './state.js';
+import { applyTheme, getCurrentTheme, themes } from './themes.js';
+import { ToolCardRenderer } from './tool-card.js';
+import { WebSocketClient } from './websocket-client.js';
 
 // Initialize components
-const wsUrl = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws';
+const wsUrl = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
 const wsClient = new WebSocketClient(wsUrl);
 const state = new StateManager();
 const messageRenderer = new MessageRenderer(document.getElementById('messages'));
@@ -22,10 +21,7 @@ const toolCardRenderer = new ToolCardRenderer(document.getElementById('messages'
 const dialogHandler = new DialogHandler(document.getElementById('dialog-container'), wsClient);
 
 // Session sidebar
-const sidebar = new SessionSidebar(
-  document.getElementById('session-list'),
-  handleSessionSelect
-);
+const sidebar = new SessionSidebar(document.getElementById('session-list'), handleSessionSelect);
 
 // UI elements
 const messageInput = document.getElementById('message-input');
@@ -53,12 +49,12 @@ let currentStreamingElement = null;
 let currentStreamingText = '';
 let sessionTotalCost = 0;
 let lastInputTokens = 0;
-let contextWindowSize = 0;  // fetched from model info
-let originalTitle = document.title;
+let contextWindowSize = 0; // fetched from model info
+const originalTitle = document.title;
 let hasFocus = true;
 let unreadCount = 0;
 let isScrolledUp = false;
-let hasNewWhileScrolled = false;
+let _hasNewWhileScrolled = false;
 let lastSentMessage = null; // Track to avoid duplicate rendering in mirror mode
 let lastUsage = null; // Full usage object for context visualiser
 let mirrorActiveSessionFile = null; // The live session file path from the TUI
@@ -98,11 +94,14 @@ fileSidebarUp.addEventListener('click', () => {
   if (parent) fileBrowser.load(parent);
 });
 
-fetch('/api/health').then(r => r.json()).then(data => {
-  const names = { win32: 'Explorer', darwin: 'Finder', linux: 'file manager' };
-  const name = names[data.platform] || 'file manager';
-  document.getElementById('file-sidebar-finder').title = `Open in ${name}`;
-}).catch(() => {});
+fetch('/api/health')
+  .then((r) => r.json())
+  .then((data) => {
+    const names = { win32: 'Explorer', darwin: 'Finder', linux: 'file manager' };
+    const name = names[data.platform] || 'file manager';
+    document.getElementById('file-sidebar-finder').title = `Open in ${name}`;
+  })
+  .catch(() => {});
 
 document.getElementById('file-sidebar-finder').addEventListener('click', () => {
   if (fileBrowser.currentPath) {
@@ -120,7 +119,6 @@ if (localStorage.getItem('tau-file-sidebar') === 'open') {
   fileBrowser.load();
 }
 
-
 // ═══════════════════════════════════════
 // Focus tracking for tab title notifications
 // ═══════════════════════════════════════
@@ -130,10 +128,6 @@ window.addEventListener('focus', () => {
   unreadCount = 0;
   document.title = originalTitle;
 });
-
-
-
-
 
 window.addEventListener('blur', () => {
   hasFocus = false;
@@ -155,11 +149,11 @@ messagesContainer.addEventListener('scroll', () => {
   const threshold = 150;
   const atBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < threshold;
   isScrolledUp = !atBottom;
-  
+
   if (atBottom) {
     scrollBottomBtn.classList.add('hidden');
     scrollBottomBadge.classList.add('hidden');
-    hasNewWhileScrolled = false;
+    _hasNewWhileScrolled = false;
   } else {
     scrollBottomBtn.classList.remove('hidden');
   }
@@ -169,12 +163,12 @@ scrollBottomBtn.addEventListener('click', () => {
   messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
   scrollBottomBtn.classList.add('hidden');
   scrollBottomBadge.classList.add('hidden');
-  hasNewWhileScrolled = false;
+  _hasNewWhileScrolled = false;
 });
 
 function showNewMessageBadge() {
   if (isScrolledUp) {
-    hasNewWhileScrolled = true;
+    _hasNewWhileScrolled = true;
     scrollBottomBadge.classList.remove('hidden');
   }
 }
@@ -187,7 +181,6 @@ wsClient.addEventListener('connected', () => {
   updateConnectionStatus('connected');
   // Fetch model context window size for token % display
   setTimeout(fetchContextWindow, 1000);
-
 });
 
 wsClient.addEventListener('disconnected', () => {
@@ -303,7 +296,6 @@ function handleAgentEnd() {
   if (!hasFocus) {
     unreadCount++;
     document.title = `(${unreadCount}) ● ${originalTitle}`;
-
   }
 }
 
@@ -313,10 +305,7 @@ function handleMessageStart(message) {
   if (message.role === 'assistant') {
     currentStreamingText = '';
     currentStreamingThinking = '';
-    currentStreamingElement = messageRenderer.renderAssistantMessage(
-      { content: '' },
-      true
-    );
+    currentStreamingElement = messageRenderer.renderAssistantMessage({ content: '' }, true);
   } else if (message.role === 'user') {
     // In mirror mode, user messages from TUI appear via events
     // Only render if we didn't just send this message ourselves
@@ -333,7 +322,10 @@ function handleMessageStart(message) {
 function getMessageText(message) {
   if (typeof message.content === 'string') return message.content;
   if (Array.isArray(message.content)) {
-    return message.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    return message.content
+      .filter((b) => b.type === 'text')
+      .map((b) => b.text)
+      .join('\n');
   }
   return '';
 }
@@ -349,10 +341,7 @@ function handleMessageUpdate(event) {
   } else if (assistantMessageEvent.type === 'text_delta') {
     currentStreamingText += assistantMessageEvent.delta;
     if (currentStreamingElement) {
-      messageRenderer.updateStreamingMessage(
-        currentStreamingElement,
-        currentStreamingText
-      );
+      messageRenderer.updateStreamingMessage(currentStreamingElement, currentStreamingText);
     }
   }
 }
@@ -474,7 +463,7 @@ messageInput.addEventListener('keydown', (e) => {
 // Auto-resize textarea
 messageInput.addEventListener('input', () => {
   messageInput.style.height = 'auto';
-  messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
+  messageInput.style.height = `${Math.min(messageInput.scrollHeight, 200)}px`;
 });
 
 // ═══════════════════════════════════════
@@ -485,8 +474,8 @@ const attachBtn = document.getElementById('attach-btn');
 const imageInput = document.getElementById('image-input');
 const imagePreviews = document.getElementById('image-previews');
 
-let pendingImages = [];     // { data: base64, mimeType }
-let pendingFilePaths = [];  // { path, name, ext } — from file browser (populated by callback above)
+let pendingImages = []; // { data: base64, mimeType }
+let pendingFilePaths = []; // { path, name, ext } — from file browser (populated by callback above)
 
 const MAX_IMAGE_DIM = 2048;
 const VALID_MIME_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
@@ -517,11 +506,14 @@ function processImageFile(file) {
         canvas.height = height;
         canvas.getContext('2d').drawImage(img, 0, 0, width, height);
 
-        const outputMime = (mimeType === 'image/jpeg') ? 'image/jpeg' : 'image/png';
-        const quality = (outputMime === 'image/jpeg') ? 0.85 : undefined;
+        const outputMime = mimeType === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+        const quality = outputMime === 'image/jpeg' ? 0.85 : undefined;
         const dataUrl = canvas.toDataURL(outputMime, quality);
         const base64 = dataUrl.split(',')[1];
-        if (!base64) { reject(new Error('Failed to encode image')); return; }
+        if (!base64) {
+          reject(new Error('Failed to encode image'));
+          return;
+        }
         resolve({ data: base64, mimeType: outputMime });
       };
       img.onerror = () => reject(new Error('Failed to decode image'));
@@ -551,7 +543,9 @@ imageInput.addEventListener('change', () => {
 });
 
 // Drag & drop on input
-messageInput.addEventListener('dragover', (e) => { e.preventDefault(); });
+messageInput.addEventListener('dragover', (e) => {
+  e.preventDefault();
+});
 messageInput.addEventListener('drop', (e) => {
   e.preventDefault();
   if (e.dataTransfer.files.length > 0) addAttachments(e.dataTransfer.files);
@@ -579,7 +573,10 @@ function makeRemoveBtn(onClick) {
 function renderAttachmentPreviews() {
   imagePreviews.innerHTML = '';
   const hasAny = pendingImages.length > 0 || pendingFilePaths.length > 0;
-  if (!hasAny) { imagePreviews.classList.add('hidden'); return; }
+  if (!hasAny) {
+    imagePreviews.classList.add('hidden');
+    return;
+  }
   imagePreviews.classList.remove('hidden');
 
   // Binary image chips
@@ -589,7 +586,12 @@ function renderAttachmentPreviews() {
     const thumb = document.createElement('img');
     thumb.src = `data:${img.mimeType};base64,${img.data}`;
     el.appendChild(thumb);
-    el.appendChild(makeRemoveBtn(() => { pendingImages.splice(i, 1); renderAttachmentPreviews(); }));
+    el.appendChild(
+      makeRemoveBtn(() => {
+        pendingImages.splice(i, 1);
+        renderAttachmentPreviews();
+      }),
+    );
     imagePreviews.appendChild(el);
   });
 
@@ -597,10 +599,8 @@ function renderAttachmentPreviews() {
   pendingFilePaths.forEach((fp, i) => {
     const el = document.createElement('div');
     const removeBtn = makeRemoveBtn(() => {
-      const withSpace = fp.path + ' ';
-      messageInput.value = messageInput.value.includes(withSpace)
-        ? messageInput.value.replace(withSpace, '')
-        : messageInput.value.replace(fp.path, '');
+      const withSpace = `${fp.path} `;
+      messageInput.value = messageInput.value.includes(withSpace) ? messageInput.value.replace(withSpace, '') : messageInput.value.replace(fp.path, '');
       messageInput.dispatchEvent(new Event('input'));
       pendingFilePaths.splice(i, 1);
       renderAttachmentPreviews();
@@ -647,7 +647,7 @@ function renderAttachmentPreviews() {
 // Send message (with images)
 // ═══════════════════════════════════════
 
-let messageQueue = [];
+const messageQueue = [];
 
 function sendMessage() {
   const message = messageInput.value.trim();
@@ -659,7 +659,7 @@ function sendMessage() {
   const cmd = { type: 'prompt', message: message || '(see attached image)' };
 
   if (pendingImages.length > 0) {
-    cmd.images = pendingImages.map(img => {
+    cmd.images = pendingImages.map((img) => {
       console.log(`[Tau] Sending image: mimeType=${img.mimeType}, dataLen=${img.data?.length}`);
       return { type: 'image', data: img.data, mimeType: img.mimeType || 'image/png' };
     });
@@ -743,12 +743,11 @@ const commands = [
   { icon: '📊', label: 'Session Stats', desc: 'Show session statistics', action: () => showSessionStats() },
   { icon: '⬇️', label: 'Expand All Tools', desc: 'Expand all tool cards', action: () => toolCardRenderer.expandAll() },
   { icon: '⬆️', label: 'Collapse All Tools', desc: 'Collapse all tool cards', action: () => toolCardRenderer.collapseAll() },
-
 ];
 
 function openCommandPalette() {
   commandList.innerHTML = '';
-  commands.forEach(cmd => {
+  commands.forEach((cmd) => {
     const el = document.createElement('div');
     el.className = 'command-item';
     el.innerHTML = `
@@ -787,15 +786,21 @@ async function rpcCommand(cmd, statusMsg) {
     const data = await resp.json();
     if (data.success) {
       statusText.textContent = 'Done';
-      setTimeout(() => { statusText.textContent = 'Connected'; }, 2000);
+      setTimeout(() => {
+        statusText.textContent = 'Connected';
+      }, 2000);
     } else {
       statusText.textContent = data.error || 'Failed';
-      setTimeout(() => { statusText.textContent = 'Connected'; }, 3000);
+      setTimeout(() => {
+        statusText.textContent = 'Connected';
+      }, 3000);
     }
     return data;
-  } catch (e) {
+  } catch (_e) {
     statusText.textContent = 'Error';
-    setTimeout(() => { statusText.textContent = 'Connected'; }, 3000);
+    setTimeout(() => {
+      statusText.textContent = 'Connected';
+    }, 3000);
   }
 }
 
@@ -803,7 +808,9 @@ async function rpcExportHtml() {
   const data = await rpcCommand({ type: 'export_html' }, 'Exporting...');
   if (data?.success && data.data?.path) {
     statusText.textContent = `Exported: ${data.data.path}`;
-    setTimeout(() => { statusText.textContent = 'Connected'; }, 4000);
+    setTimeout(() => {
+      statusText.textContent = 'Connected';
+    }, 4000);
   }
 }
 
@@ -811,11 +818,7 @@ async function showSessionStats() {
   const data = await rpcCommand({ type: 'get_session_stats' }, 'Loading stats...');
   if (data?.success && data.data) {
     const s = data.data;
-    const lines = [
-      `📊 Session Stats`,
-      `Messages: ${s.totalMessages} (${s.userMessages} user, ${s.assistantMessages} assistant)`,
-      `Tool calls: ${s.toolCalls}`,
-    ];
+    const lines = ['📊 Session Stats', `Messages: ${s.totalMessages} (${s.userMessages} user, ${s.assistantMessages} assistant)`, `Tool calls: ${s.toolCalls}`];
     if (s.tokens) {
       lines.push(`Context: ~${(s.tokens.input / 1000).toFixed(1)}k tokens`);
     }
@@ -856,7 +859,7 @@ async function fetchModelInfo() {
       currentModelId = stateData.data.model.id || '';
       updateModelLabel();
 
-      const model = availableModels.find(m => m.id === currentModelId);
+      const model = availableModels.find((m) => m.id === currentModelId);
       if (model?.contextWindow) {
         contextWindowSize = model.contextWindow;
         updateTokenUsage();
@@ -866,7 +869,7 @@ async function fetchModelInfo() {
       currentThinkingLevel = stateData.data.thinkingLevel;
       updateThinkingBtn();
     }
-  } catch (e) {
+  } catch (_e) {
     // ignore
   }
 }
@@ -903,7 +906,7 @@ function openModelDropdown() {
   function renderItems(filter) {
     itemsContainer.innerHTML = '';
     const query = (filter || '').toLowerCase();
-    availableModels.forEach(m => {
+    availableModels.forEach((m) => {
       const shortName = m.id.replace(/-\d{8}$/, '');
       const providerStr = m.provider || '';
       if (query && !shortName.toLowerCase().includes(query) && !providerStr.toLowerCase().includes(query)) return;
@@ -932,7 +935,10 @@ function openModelDropdown() {
 
   search.addEventListener('input', () => renderItems(search.value));
   search.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeModelDropdown(); e.stopPropagation(); }
+    if (e.key === 'Escape') {
+      closeModelDropdown();
+      e.stopPropagation();
+    }
     if (e.key === 'Enter') {
       const first = itemsContainer.querySelector('.model-dropdown-item');
       if (first) first.click();
@@ -1035,8 +1041,6 @@ sidebarOverlay.addEventListener('click', () => {
   updateSidebarToggleIcon();
 });
 
-
-
 const newSessionBtn = document.getElementById('new-session-btn');
 newSessionBtn.addEventListener('click', () => {
   sessionTotalCost = 0;
@@ -1070,37 +1074,49 @@ refreshSessionsBtn.addEventListener('click', () => {
   let touchStartY = 0;
   let tracking = false;
 
-  document.addEventListener('touchstart', (e) => {
-    const touch = e.touches[0];
-    // Only track swipes starting within 20px of left edge
-    if (touch.clientX < 20 && isMobile() && sidebarEl.classList.contains('collapsed')) {
-      touchStartX = touch.clientX;
-      touchStartY = touch.clientY;
-      tracking = true;
-    }
-  }, { passive: true });
+  document.addEventListener(
+    'touchstart',
+    (e) => {
+      const touch = e.touches[0];
+      // Only track swipes starting within 20px of left edge
+      if (touch.clientX < 20 && isMobile() && sidebarEl.classList.contains('collapsed')) {
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        tracking = true;
+      }
+    },
+    { passive: true },
+  );
 
-  document.addEventListener('touchmove', (e) => {
-    if (!tracking) return;
-    const touch = e.touches[0];
-    const dx = touch.clientX - touchStartX;
-    const dy = Math.abs(touch.clientY - touchStartY);
-    // If vertical movement dominates, cancel
-    if (dy > dx) {
+  document.addEventListener(
+    'touchmove',
+    (e) => {
+      if (!tracking) return;
+      const touch = e.touches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = Math.abs(touch.clientY - touchStartY);
+      // If vertical movement dominates, cancel
+      if (dy > dx) {
+        tracking = false;
+      }
+    },
+    { passive: true },
+  );
+
+  document.addEventListener(
+    'touchend',
+    (e) => {
+      if (!tracking) return;
       tracking = false;
-    }
-  }, { passive: true });
-
-  document.addEventListener('touchend', (e) => {
-    if (!tracking) return;
-    tracking = false;
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - touchStartX;
-    if (dx > 60) {
-      sidebarEl.classList.remove('collapsed');
-      sidebarOverlay.classList.add('visible');
-    }
-  }, { passive: true });
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - touchStartX;
+      if (dx > 60) {
+        sidebarEl.classList.remove('collapsed');
+        sidebarOverlay.classList.add('visible');
+      }
+    },
+    { passive: true },
+  );
 })();
 
 // Session search
@@ -1108,7 +1124,7 @@ sessionSearchInput.addEventListener('input', () => {
   sidebar.setSearchQuery(sessionSearchInput.value);
 });
 
-async function newSession() {
+async function _newSession() {
   sessionTotalCost = 0;
   lastInputTokens = 0;
   updateCostDisplay();
@@ -1143,7 +1159,7 @@ async function switchSession(sessionFile, session = null, project = null) {
     currentStreamingElement = null;
     currentStreamingThinking = '';
     currentStreamingText = '';
-    
+
     state.reset();
     messageRenderer.clear();
     toolCardRenderer.clear();
@@ -1177,10 +1193,10 @@ async function switchSession(sessionFile, session = null, project = null) {
     // In mirror mode, check if this session is live on any instance
     if (isMirrorMode) {
       // Check if this session is live on a different instance
-      const otherInstance = liveInstances.find(i => i.sessionFile === sessionFile && i.port !== new URL(wsClient.url).port * 1);
+      const otherInstance = liveInstances.find((i) => i.sessionFile === sessionFile && i.port !== new URL(wsClient.url).port * 1);
       if (otherInstance) {
         // Reconnect to the other instance
-        const protocol = document.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const protocol = document.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const newUrl = `${protocol}//${location.hostname}:${otherInstance.port}/ws`;
         console.log(`[App] Switching to instance on port ${otherInstance.port}`);
         wsClient.disconnect();
@@ -1264,11 +1280,11 @@ function handleMirrorSync(data) {
 
 // Mark all live sessions in the sidebar with a green dot
 function updateMirrorLiveIndicator() {
-  const liveFiles = new Set(liveInstances.map(i => i.sessionFile));
+  const liveFiles = new Set(liveInstances.map((i) => i.sessionFile));
   // Also include the current mirror session
   if (mirrorActiveSessionFile) liveFiles.add(mirrorActiveSessionFile);
 
-  document.querySelectorAll('.session-item').forEach(el => {
+  document.querySelectorAll('.session-item').forEach((el) => {
     el.classList.toggle('mirror-live', liveFiles.has(el.dataset.filePath));
   });
 }
@@ -1311,7 +1327,10 @@ function updateMirrorInputState() {
 
 function renderSessionHistory(entries) {
   console.log(`[History] Rendering ${entries.length} entries`);
-  let userCount = 0, assistantCount = 0, toolCardCount = 0, toolResultCount = 0;
+  let userCount = 0,
+    assistantCount = 0,
+    toolCardCount = 0,
+    toolResultCount = 0;
 
   for (const entry of entries) {
     if (entry.type !== 'message') continue;
@@ -1360,7 +1379,7 @@ function renderSessionHistory(entries) {
             usage: msg.usage,
           },
           false,
-          true
+          true,
         );
 
         // Track cost and tokens from history
@@ -1385,17 +1404,13 @@ function renderSessionHistory(entries) {
       }
     } else if (msg.role === 'toolResult') {
       toolResultCount++;
-      toolCardRenderer.addHistoryResult(
-        msg.toolCallId,
-        { content: msg.content || [] },
-        msg.isError
-      );
+      toolCardRenderer.addHistoryResult(msg.toolCallId, { content: msg.content || [] }, msg.isError);
     }
   }
 
   console.log(`[History] Done: ${userCount} users, ${assistantCount} assistants, ${toolCardCount} tools, ${toolResultCount} results`);
-  console.log(`[History] DOM tool-card count:`, document.querySelectorAll('.tool-card').length);
-  console.log(`[History] DOM thinking-block count:`, document.querySelectorAll('.thinking-block').length);
+  console.log('[History] DOM tool-card count:', document.querySelectorAll('.tool-card').length);
+  console.log('[History] DOM thinking-block count:', document.querySelectorAll('.thinking-block').length);
 
   updateCostDisplay();
   updateTokenUsage();
@@ -1490,13 +1505,16 @@ function updateConnectionStatus(status) {
     statusText.title = tailscaleUrl || '';
     // Fetch tailscale info on first connect
     if (!tailscaleUrl) {
-      fetch('/api/health').then(r => r.json()).then(data => {
-        if (data.tailscaleUrl) {
-          tailscaleUrl = data.tailscaleUrl;
-          statusText.textContent = 'Connected • TS';
-          statusText.title = tailscaleUrl;
-        }
-      }).catch(() => {});
+      fetch('/api/health')
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.tailscaleUrl) {
+            tailscaleUrl = data.tailscaleUrl;
+            statusText.textContent = 'Connected • TS';
+            statusText.title = tailscaleUrl;
+          }
+        })
+        .catch(() => {});
     }
   } else if (status === 'disconnected') {
     statusText.textContent = 'Disconnected';
@@ -1541,19 +1559,15 @@ wsClient.addEventListener('sessionSwitch', () => {
 // Theme / Settings
 // ═══════════════════════════════════════
 
-
-
 const settingsBtn = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
 const settingsOverlay = document.getElementById('settings-overlay');
 const settingsClose = document.getElementById('settings-close');
 const themeGrid = document.getElementById('theme-grid');
 
-
 const toggleAutoCompact = document.getElementById('toggle-auto-compact');
 const btnThinkingLevel = document.getElementById('btn-thinking-level');
 const toggleShowThinking = document.getElementById('toggle-show-thinking');
-
 
 function buildThemeGrid() {
   themeGrid.innerHTML = '';
@@ -1562,13 +1576,13 @@ function buildThemeGrid() {
   for (const [id, theme] of Object.entries(themes)) {
     const btn = document.createElement('button');
     btn.className = `theme-swatch${current === id ? ' active' : ''}`;
-    const dots = (theme.colors || []).map(c => 
-      `<span class="swatch-dot" style="background:${c}"></span>`
-    ).join('');
+    const dots = (theme.colors || []).map((c) => `<span class="swatch-dot" style="background:${c}"></span>`).join('');
     btn.innerHTML = `<span class="swatch-colors">${dots}</span>`;
     btn.addEventListener('click', () => {
       applyTheme(id);
-      themeGrid.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+      themeGrid.querySelectorAll('.theme-swatch').forEach((s) => {
+        s.classList.remove('active');
+      });
       btn.classList.add('active');
     });
     themeGrid.appendChild(btn);
@@ -1599,7 +1613,7 @@ async function openSettings() {
       // Session name
       inputSessionName.value = s.sessionName || '';
     }
-  } catch (e) {
+  } catch (_e) {
     // Silent
   }
 
@@ -1667,10 +1681,6 @@ toggleAuth.addEventListener('click', async () => {
   }
 });
 
-
-
-
-
 // Restore saved theme
 const savedTheme = getCurrentTheme();
 applyTheme(savedTheme);
@@ -1685,7 +1695,6 @@ const contextLegend = document.getElementById('context-legend');
 const contextVizUsed = document.getElementById('context-viz-used');
 const contextVizTotal = document.getElementById('context-viz-total');
 
-
 function formatTokens(n) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
@@ -1697,8 +1706,8 @@ function updateContextViz() {
 
   const input = lastUsage.input || 0;
   const cacheRead = lastUsage.cacheRead || 0;
-  const cacheWrite = lastUsage.cacheWrite || 0;
-  const output = lastUsage.output || 0;
+  const _cacheWrite = lastUsage.cacheWrite || 0;
+  const _output = lastUsage.output || 0;
   const total = contextWindowSize;
 
   // Input tokens include cache — break it down
@@ -1832,7 +1841,9 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     isRecording = false;
     micBtn.classList.remove('recording');
     micBtn.title = 'Voice input';
-    try { recognition.stop(); } catch {}
+    try {
+      recognition.stop();
+    } catch {}
     // Commit final transcript
     messageInput.value = finalTranscript;
     messageInput.dispatchEvent(new Event('input'));
@@ -1842,8 +1853,6 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
   // No speech recognition support — hide mic button
   micBtn.style.display = 'none';
 }
-
-
 
 // ═══════════════════════════════════════
 // Initialize
@@ -1912,7 +1921,8 @@ function addLauncherNav() {
   const launcherLink = document.createElement('span');
   launcherLink.className = 'mode-link mode-link-launcher';
   launcherLink.title = 'Projects';
-  launcherLink.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
+  launcherLink.innerHTML =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
   launcherLink.addEventListener('click', () => {
     showLauncher();
   });
@@ -1926,7 +1936,9 @@ function showLauncher() {
   document.querySelector('.welcome')?.remove();
 
   // Update nav state
-  document.querySelectorAll('.mode-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.mode-link').forEach((l) => {
+    l.classList.remove('active');
+  });
   document.querySelector('.mode-link-launcher')?.classList.add('active');
 
   launcher.load();
@@ -1938,7 +1950,9 @@ function hideLauncher() {
   document.querySelector('.input-area').style.display = '';
 
   // Update nav state
-  document.querySelectorAll('.mode-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.mode-link').forEach((l) => {
+    l.classList.remove('active');
+  });
   document.querySelector('.mode-link:first-child')?.classList.add('active');
 }
 

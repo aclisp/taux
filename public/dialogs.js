@@ -26,8 +26,8 @@ export class DialogHandler {
     `;
 
     const optionsContainer = dialog.querySelector('#dialog-options');
-    
-    (options || []).forEach(option => {
+
+    (options || []).forEach((option) => {
       const optionDiv = document.createElement('div');
       optionDiv.className = 'dialog-option';
       optionDiv.textContent = option;
@@ -88,7 +88,7 @@ export class DialogHandler {
     `;
 
     const input = dialog.querySelector('#dialog-input');
-    
+
     const submit = () => {
       const value = input.value.trim();
       this.respond(id, value ? { value } : { cancelled: true });
@@ -104,7 +104,7 @@ export class DialogHandler {
     };
 
     this.showDialog(dialog, timeout, id);
-    
+
     // Focus input after a short delay
     setTimeout(() => input.focus(), 100);
   }
@@ -137,25 +137,25 @@ export class DialogHandler {
     };
 
     this.showDialog(dialog, timeout, id);
-    
+
     // Focus textarea after a short delay
     setTimeout(() => textarea.focus(), 100);
   }
 
   showNotification(request) {
     const { message, notifyType } = request;
-    
+
     // Create a temporary notification element
     const notification = document.createElement('div');
     notification.className = 'error-message';
     notification.textContent = `${notifyType === 'error' ? '⚠️' : notifyType === 'warning' ? '⚠️' : 'ℹ️'} ${message}`;
-    
+
     // Add to messages container temporarily
     const messagesContainer = document.getElementById('messages');
     if (messagesContainer) {
       messagesContainer.appendChild(notification);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      
+
       // Remove after 5 seconds
       setTimeout(() => {
         notification.remove();
@@ -182,7 +182,7 @@ export class DialogHandler {
       clearTimeout(this.timeoutId);
       this.timeoutId = null;
     }
-    
+
     this.container.innerHTML = '';
     this.container.classList.add('hidden');
     this.currentDialog = null;
@@ -193,7 +193,7 @@ export class DialogHandler {
     this.wsClient.send({
       type: 'extension_ui_response',
       id,
-      ...response
+      ...response,
     });
   }
 
