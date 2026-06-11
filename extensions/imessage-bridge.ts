@@ -12,7 +12,7 @@
  *   BB_POLL_INTERVAL - Poll interval in ms (default: 2000)
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as http from "node:http";
@@ -261,10 +261,11 @@ export default function (pi: ExtensionAPI) {
 
     // Get text content from the message
     let responseText = "";
-    if (typeof message.content === "string") {
-      responseText = message.content;
-    } else if (Array.isArray(message.content)) {
-      responseText = message.content
+    const content = "content" in message ? message.content : undefined;
+    if (typeof content === "string") {
+      responseText = content;
+    } else if (Array.isArray(content)) {
+      responseText = content
         .filter((b: any) => b.type === "text")
         .map((b: any) => b.text)
         .join("\n");
@@ -347,13 +348,16 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("imessage", {
     description: "Send an iMessage to Matt",
-    args: [{ name: "message", description: "Message text", required: true }],
-    execute: async (args, ctx) => {
+    handler: async (args: string, ctx) => {
       if (!enabled) {
         ctx.ui.notify("iMessage bridge not connected", "error");
         return;
       }
-      const text = args.join(" ");
+      const text = args.trim();
+      if (!text) {
+        ctx.ui.notify("Usage: /imessage <message>", "warning");
+        return;
+      }
       await sendIMessage(text);
       ctx.ui.notify(`Sent iMessage: ${text.substring(0, 50)}...`, "info");
     },
@@ -361,7 +365,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("imessage-status", {
     description: "Check iMessage bridge status",
-    execute: async (_args, ctx) => {
+    handler: async (_args: string, ctx) => {
       ctx.ui.notify(
         enabled
           ? `iMessage bridge active. Polling every ${BB_POLL_INTERVAL / 1000}s. Last message time: ${lastMessageTime}`

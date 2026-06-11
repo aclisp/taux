@@ -1,16 +1,16 @@
 /**
  * Mirror Server Extension
- * 
+ *
  * Starts a WebSocket + HTTP server inside the running Pi process,
  * allowing a browser to connect and mirror the TUI session in real-time.
- * 
+ *
  * - Forwards all Pi events to connected browser clients
  * - Accepts commands from the browser and executes them via the extension API
  * - Serves static files for the Tau web UI
  * - Sends full state snapshot on client connect (messages, model, etc.)
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { WebSocketServer, WebSocket } from "ws";
 import * as http from "node:http";
 import * as fs from "node:fs";
@@ -384,7 +384,7 @@ export default function (pi: ExtensionAPI) {
     let text = "";
     if (typeof content === "string") text = content;
     else if (Array.isArray(content)) {
-      const tb = content.find((b: any) => b.type === "text");
+      const tb = content.find((b) => b.type === "text");
       if (tb) text = tb.text;
     }
     if (text) userMessages.push(text.substring(0, 300));
@@ -993,9 +993,7 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
         let dirPath = explicitPath || process.cwd();
         if (!explicitPath && latestCtx) {
           try {
-            const entries = latestCtx.sessionManager.getEntries();
-            const sessionEntry = entries.find((e: any) => e.type === "session");
-            if (sessionEntry?.cwd) dirPath = sessionEntry.cwd;
+            dirPath = latestCtx.sessionManager.getCwd();
           } catch {}
         }
         serveFileList(res, dirPath);
