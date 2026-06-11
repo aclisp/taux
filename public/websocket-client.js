@@ -132,6 +132,17 @@ export class WebSocketClient extends EventTarget {
       case 'error':
         this.dispatchEvent(new CustomEvent('serverError', { detail: message }));
         break;
+      case 'response':
+        if (!message.success) {
+          this.dispatchEvent(
+            new CustomEvent('serverError', {
+              detail: {
+                message: message.error || 'Command failed',
+              },
+            }),
+          );
+        }
+        break;
       case 'session_switch':
         this.dispatchEvent(new CustomEvent('sessionSwitch'));
         break;
