@@ -18,6 +18,8 @@ import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-a
 import QRCode from 'qrcode';
 import { WebSocket, WebSocketServer } from 'ws';
 
+type NoticeLevel = 'info' | 'warning' | 'error';
+
 // Load tau settings from ~/.pi/agent/settings.json (falls back to env vars)
 function loadTauSettings(): { port: number; host: string; autoStart: boolean; user: string; pass: string; authEnabled?: boolean; projectsDir?: string } {
   let settings: any = {};
@@ -134,7 +136,7 @@ function getRunningInstances(): Array<{ port: number; pid: number; sessionFile: 
  * A zombie is detected by checking if the process has a controlling terminal.
  * If it doesn't, the HTTP server is the only thing keeping it alive.
  */
-function cleanupZombieInstances() {
+function cleanupZombieInstances(report?: (message: string) => void) {
   if (process.platform === 'win32') return;
   if (!fs.existsSync(INSTANCES_DIR)) return;
   const { execSync } = require('node:child_process');
@@ -160,7 +162,7 @@ function cleanupZombieInstances() {
         const tty = execSync(`ps -o tty= -p ${info.pid}`, { encoding: 'utf8' }).trim();
         if (!tty || tty === '??' || tty === '-') {
           // No terminal — this is a zombie, kill it
-          console.log(`[Mirror] Killing zombie Tau instance (PID ${info.pid}, port ${info.port})`);
+          report?.(`Tau mirror killed zombie instance PID ${info.pid} on port ${info.port}`);
           process.kill(info.pid, 'SIGTERM');
           try {
             fs.unlinkSync(path.join(INSTANCES_DIR, file));
@@ -229,6 +231,27 @@ export default function (pi: ExtensionAPI) {
 
   // Pending RPC-style requests from browser (id -> resolver)
   const _pendingRequests = new Map<string, (response: any) => void>();
+  let mirrorStatusLabel = '';
+
+  // ═══════════════════════════════════════
+  // Helper: show TUI-safe status and notices
+  // ═══════════════════════════════════════
+  function notify(message: string, level: NoticeLevel = 'info', ctx = latestCtx) {
+    if (!ctx?.hasUI) return;
+    ctx.ui.notify(message, level);
+  }
+
+  function updateMirrorStatus(ctx = latestCtx) {
+    if (!ctx?.hasUI) return;
+    if (!mirrorStatusLabel) {
+      ctx.ui.setStatus('mirror', undefined);
+      return;
+    }
+    const theme = ctx.ui.theme;
+    const clientCount = clients.size;
+    const clientSuffix = clientCount > 0 ? theme.fg('muted', ` • ${clientCount} client${clientCount === 1 ? '' : 's'}`) : '';
+    ctx.ui.setStatus('mirror', `${theme.fg('accent', mirrorStatusLabel)}${clientSuffix}`);
+  }
 
   // ═══════════════════════════════════════
   // Helper: send to one client
@@ -277,6 +300,8 @@ export default function (pi: ExtensionAPI) {
     unregisterInstance();
     mirrorUrl = '';
     tailscaleUrl = '';
+    mirrorStatusLabel = '';
+    updateMirrorStatus();
   }
 
   // ═══════════════════════════════════════
@@ -290,9 +315,7 @@ export default function (pi: ExtensionAPI) {
         return;
       }
       stopServer();
-      ctx.ui.setStatus('mirror', '');
       ctx.ui.notify('Tau mirror server stopped', 'info');
-      console.log('[Mirror] Server stopped via /taustop');
     },
   });
 
@@ -534,13 +557,12 @@ export default function (pi: ExtensionAPI) {
               const content: any[] = [{ type: 'text', text: command.message || '(see attached image)' }];
               for (const img of command.images) {
                 if (!img.data || typeof img.data !== 'string') {
-                  console.error('[mirror-server] Skipping image: missing or invalid data');
+                  notify('Tau mirror skipped an invalid browser image payload', 'warning');
                   continue;
                 }
                 // Strip data URL prefix if accidentally included
                 const data = img.data.includes(',') ? img.data.split(',')[1] : img.data;
                 const mimeType = (validMimes.includes(img.mimeType) ? img.mimeType : 'image/png') as 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
-                console.log(`[mirror-server] Image: mimeType=${mimeType}, dataLen=${data.length}, rawMimeType=${img.mimeType}`);
                 const imageBlock = {
                   type: 'image' as const,
                   data: data,
@@ -548,7 +570,7 @@ export default function (pi: ExtensionAPI) {
                 };
                 // Defensive: verify mimeType is actually set (debug crash where it was missing)
                 if (!imageBlock.mimeType) {
-                  console.error(`[mirror-server] BUG: mimeType is falsy after assignment! img.mimeType=${img.mimeType}, falling back to image/png`);
+                  notify('Tau mirror image payload had no MIME type; using image/png', 'error');
                   imageBlock.mimeType = 'image/png';
                 }
                 content.push(imageBlock);
@@ -1053,16 +1075,16 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
             exec(
               `powershell -NoProfile -WindowStyle Hidden -Command "& { $wsh = New-Object -ComObject WScript.Shell; $wsh.Run('explorer \\"${safe}\\"', 1, $false) }"`,
               (err) => {
-                if (err) console.error('[Mirror] open failed:', err.message);
+                if (err) notify(`Tau mirror could not open the file: ${err.message}`, 'error');
               },
             );
           } else if (process.platform === 'darwin') {
             execFile('open', [fp], (err) => {
-              if (err) console.error('[Mirror] open failed:', err.message);
+              if (err) notify(`Tau mirror could not open the file: ${err.message}`, 'error');
             });
           } else {
             execFile('xdg-open', [fp], (err) => {
-              if (err) console.error('[Mirror] open failed:', err.message);
+              if (err) notify(`Tau mirror could not open the file: ${err.message}`, 'error');
             });
           }
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1610,7 +1632,7 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
     if (server) return; // Already running
 
     // Clean up zombie instances from killed tmux panes etc.
-    cleanupZombieInstances();
+    cleanupZombieInstances((message) => notify(message, 'warning', ctx));
 
     server = http.createServer(serveStaticFile);
     wss = new WebSocketServer({ noServer: true });
@@ -1631,8 +1653,8 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
     });
 
     wss.on('connection', (ws) => {
-      console.log('[Mirror] Browser client connected');
       clients.add(ws);
+      updateMirrorStatus(ctx);
       (ws as any).isAlive = true;
 
       ws.on('pong', () => {
@@ -1653,19 +1675,19 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
         try {
           const command = JSON.parse(data.toString());
           handleCommand(ws, command);
-        } catch (e) {
-          console.error('[Mirror] Failed to parse client message:', e);
+        } catch {
+          notify('Tau mirror ignored an invalid browser message', 'warning');
         }
       });
 
       ws.on('close', () => {
-        console.log('[Mirror] Browser client disconnected');
         clients.delete(ws);
+        updateMirrorStatus();
       });
 
-      ws.on('error', (e) => {
-        console.error('[Mirror] Client error:', e);
+      ws.on('error', () => {
         clients.delete(ws);
+        updateMirrorStatus();
       });
     });
 
@@ -1702,7 +1724,7 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
           const instances = getRunningInstances();
           const stale = instances.find((i) => i.port === port && i.pid !== process.pid);
           if (stale) {
-            console.log(`[Mirror] Port ${port} in use by stale Tau instance (PID ${stale.pid}), killing...`);
+            notify(`Tau mirror found stale instance PID ${stale.pid} on port ${port}; stopping it`, 'warning', ctx);
             try {
               process.kill(stale.pid, 'SIGTERM');
             } catch {}
@@ -1713,11 +1735,13 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
             }, 500);
             return;
           }
-          console.log(`[Mirror] Port ${port} in use, trying ${port + 1}...`);
+          ctx.ui.setStatus('mirror', ctx.ui.theme.fg('warning', `Mirror: port ${port} busy, trying ${port + 1}`));
           server!.removeAllListeners('error');
           tryListen(port + 1, maxAttempts);
         } else {
-          console.error('[Mirror] Failed to start server:', err.message);
+          mirrorStatusLabel = '';
+          updateMirrorStatus(ctx);
+          notify(`Tau mirror failed to start: ${err.message}`, 'error', ctx);
         }
       });
     };
@@ -1770,8 +1794,8 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
 
       mirrorUrl = `http://${localIp}:${port}`;
       tailscaleUrl = tailscaleIp ? `http://${tailscaleIp}:${port}` : '';
-      console.log(`[Mirror] Tau mirror server running on ${mirrorUrl}${tailscaleUrl ? `  •  Tailscale: ${tailscaleUrl}` : ''}`);
-      ctx.ui.setStatus('mirror', `Mirror: ${localIp}:${port}${tailscaleIp ? ` • TS: ${tailscaleIp}:${port}` : ''}`);
+      mirrorStatusLabel = `Mirror: ${localIp}:${port}${tailscaleIp ? ` • TS: ${tailscaleIp}:${port}` : ''}`;
+      updateMirrorStatus(ctx);
 
       // Register this instance
       const sessionFile = ctx.sessionManager.getSessionFile() || '';
@@ -1790,7 +1814,7 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
     latestCtx = ctx;
 
     if (!TAU_AUTO_START) {
-      console.log('[Mirror] Tau auto-start disabled (TAU_DISABLED=1). Use /tau-start to start manually.');
+      ctx.ui.setStatus('mirror', ctx.ui.theme.fg('dim', 'Mirror: disabled'));
       return;
     }
 
@@ -1802,6 +1826,5 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
   // ═══════════════════════════════════════
   pi.on('session_shutdown', async () => {
     stopServer();
-    console.log('[Mirror] Server shut down');
   });
 }
