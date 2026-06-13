@@ -131,45 +131,44 @@ function getRunningInstances(): Array<{ port: number; pid: number; sessionFile: 
 }
 
 /**
+ * Check if a process is a zombie (alive but has no controlling terminal).
+ * Orphaned processes from killed tmux panes lose their TTY.
+ */
+function isZombie(pid: number): boolean {
+  if (process.platform === 'win32') return false;
+  const { execSync } = require('node:child_process');
+  try {
+    const tty = execSync(`ps -o tty= -p ${pid}`, { encoding: 'utf8' }).trim();
+    return !tty || tty === '??' || tty === '-';
+  } catch {
+    // ps failed — treat as dead/zombie
+    return true;
+  }
+}
+
+/**
  * Kill zombie Tau instances — processes that are alive but orphaned
  * (e.g. tmux pane was killed without session_shutdown firing).
- * A zombie is detected by checking if the process has a controlling terminal.
- * If it doesn't, the HTTP server is the only thing keeping it alive.
  */
 function cleanupZombieInstances(report?: (message: string) => void) {
   if (process.platform === 'win32') return;
   if (!fs.existsSync(INSTANCES_DIR)) return;
-  const { execSync } = require('node:child_process');
   for (const file of fs.readdirSync(INSTANCES_DIR)) {
     if (!file.endsWith('.json')) continue;
     try {
       const info = JSON.parse(fs.readFileSync(path.join(INSTANCES_DIR, file), 'utf8'));
-      // Skip our own process
       if (info.pid === process.pid) continue;
-      // Check if process is alive
       try {
         process.kill(info.pid, 0);
       } catch {
-        // Already dead — clean up
         try {
           fs.unlinkSync(path.join(INSTANCES_DIR, file));
         } catch {}
         continue;
       }
-      // Check if process has a controlling terminal (TTY)
-      // Orphaned processes from killed tmux panes lose their TTY
-      try {
-        const tty = execSync(`ps -o tty= -p ${info.pid}`, { encoding: 'utf8' }).trim();
-        if (!tty || tty === '??' || tty === '-') {
-          // No terminal — this is a zombie, kill it
-          report?.(`Tau mirror killed zombie instance PID ${info.pid} on port ${info.port}`);
-          process.kill(info.pid, 'SIGTERM');
-          try {
-            fs.unlinkSync(path.join(INSTANCES_DIR, file));
-          } catch {}
-        }
-      } catch {
-        // ps failed — process might have died between checks, clean up
+      if (isZombie(info.pid)) {
+        report?.(`Tau mirror killed zombie instance PID ${info.pid} on port ${info.port}`);
+        process.kill(info.pid, 'SIGTERM');
         try {
           fs.unlinkSync(path.join(INSTANCES_DIR, file));
         } catch {}
@@ -1720,15 +1719,14 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
       });
       server!.once('error', (err: any) => {
         if (err.code === 'EADDRINUSE' && port < PORT + maxAttempts) {
-          // Check if a stale Tau instance owns this port and kill it
+          // If a zombie Tau instance holds this port, kill it and retry
           const instances = getRunningInstances();
-          const stale = instances.find((i) => i.port === port && i.pid !== process.pid);
-          if (stale) {
-            notify(`Tau mirror found stale instance PID ${stale.pid} on port ${port}; stopping it`, 'warning', ctx);
+          const occupant = instances.find((i) => i.port === port && i.pid !== process.pid);
+          if (occupant && isZombie(occupant.pid)) {
+            notify(`Tau mirror found zombie instance PID ${occupant.pid} on port ${port}; stopping it`, 'warning', ctx);
             try {
-              process.kill(stale.pid, 'SIGTERM');
+              process.kill(occupant.pid, 'SIGTERM');
             } catch {}
-            // Wait briefly then retry the same port
             setTimeout(() => {
               server!.removeAllListeners('error');
               tryListen(port, maxAttempts);
