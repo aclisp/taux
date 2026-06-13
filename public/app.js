@@ -1041,21 +1041,6 @@ sidebarOverlay.addEventListener('click', () => {
   updateSidebarToggleIcon();
 });
 
-const newSessionBtn = document.getElementById('new-session-btn');
-newSessionBtn.addEventListener('click', () => {
-  sessionTotalCost = 0;
-  lastInputTokens = 0;
-  updateCostDisplay();
-  updateTokenUsage();
-  state.reset();
-  messageRenderer.clear();
-  toolCardRenderer.clear();
-  messageRenderer.renderWelcome();
-  sidebar.clearActive();
-  viewingActiveSession = false;
-  updateMirrorInputState();
-});
-
 refreshSessionsBtn.addEventListener('click', () => {
   if (isMobile()) {
     location.reload();
@@ -1123,20 +1108,6 @@ refreshSessionsBtn.addEventListener('click', () => {
 sessionSearchInput.addEventListener('input', () => {
   sidebar.setSearchQuery(sessionSearchInput.value);
 });
-
-async function _newSession() {
-  sessionTotalCost = 0;
-  lastInputTokens = 0;
-  updateCostDisplay();
-  updateTokenUsage();
-  await switchSession(null);
-  sidebar.clearActive();
-  if (isMobile()) {
-    sidebarEl.classList.add('collapsed');
-    sidebarOverlay.classList.remove('visible');
-  }
-  if (!isMobile()) messageInput.focus();
-}
 
 async function handleSessionSelect(session, project) {
   sidebar.setActive(session.filePath);

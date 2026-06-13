@@ -468,8 +468,7 @@ body {
   -webkit-app-region: no-drag;
 }
 
-.icon-btn,
-.new-session-btn {
+.icon-btn {
   width: 28px;
   height: 28px;
   padding: 0;
@@ -486,18 +485,14 @@ body {
   transition: all var(--duration) var(--ease);
 }
 
-.icon-btn:hover,
-.new-session-btn:hover {
+.icon-btn:hover {
   background: var(--bg-glass-hover);
   color: var(--text-secondary);
 }
 
-.icon-btn:active,
-.new-session-btn:active {
+.icon-btn:active {
   opacity: 0.7;
 }
-
-.new-session-btn { color: var(--accent-text); }
 
 .icon-btn.spinning { animation: spin 0.5s ease; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -3258,8 +3253,7 @@ body.hide-thinking .thinking-block { display: none !important; }
     border-radius: var(--radius-md);
   }
 
-  .icon-btn,
-  .new-session-btn {
+  .icon-btn {
     width: 36px;
     height: 36px;
     font-size: 18px;
