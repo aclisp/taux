@@ -700,13 +700,14 @@ export default function (pi: ExtensionAPI) {
           const idx = levels.indexOf(current);
           const next = levels[(idx + 1) % levels.length];
           pi.setThinkingLevel(next as any);
-          sendTo(ws, success('cycle_thinking_level', { level: next }));
+          // Read back actual level — model may not support the requested one
+          sendTo(ws, success('cycle_thinking_level', { level: pi.getThinkingLevel() }));
           break;
         }
 
         case 'set_thinking_level': {
           pi.setThinkingLevel(command.level);
-          sendTo(ws, success('set_thinking_level'));
+          sendTo(ws, success('set_thinking_level', { level: pi.getThinkingLevel() }));
           break;
         }
 
